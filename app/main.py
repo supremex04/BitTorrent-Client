@@ -81,6 +81,8 @@ def main():
         decoded_data =decode_bencode(data)
         f.close()
         tracker_url, hinfo, length, piece_list = info(decoded_data)
+        # converting hexdigest which is of 40 characters long (each byte is represented as two hex characters) 
+        # to a 20 byte binary representation digest
         info_hash_byte = bytes.fromhex(hinfo)
         params = {
             'info_hash' : info_hash_byte,
@@ -95,9 +97,20 @@ def main():
         if response.status_code == 200:
             
             
-            print('Success: ')
+            print('Success, IP address and port of peers:  ')
+            # response.content has binary representation of response and response.text has text representation
             decoded_response = bencodepy.decode(response.content)
-            print(decoded_response)
+            peers = decoded_response[b'peers']
+            # every 6 byte contains IP address and port
+            # first 4 bytes are IP address, rest are port eg: 192.150.20.11:34501
+            peers_ip = []
+            for i in range(0,len(peers), 6):
+                peers_ip.append(f"{peers[i]}.{peers[i+1]}.{peers[i+2]}.{peers[i+3]}:{peers[i+4]}{peers[i+5]}")
+            for item in peers_ip:
+                print(item)
+
+
+
         else:
             print( 'Error:', response.status_code)
 
