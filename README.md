@@ -4,6 +4,7 @@
 ./bittorrent.sh {command} {bencode/file}
 ```
 commands: 
-decode: decoding simple bencode
-decodetorrent: decoding torrent file
-info: to extract annouce and lenght
+
+-decode: decoding simple bencode
+-decodetorrent: decoding torrent file
+-info: to extract annouce and lenght
