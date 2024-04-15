@@ -1,7 +1,7 @@
 import json
 import sys
 import bencodepy
-
+import hashlib
 # - decode_bencode(b"5:hello") -> b"hello"
 # - decode_bencode(b"10:hello12345") -> b"hello12345"
 def decode_bencode(bencoded_value):
@@ -55,8 +55,12 @@ def main():
         f.close()
         tracker_url = decoded_data[b"announce"]
         length = decoded_data[b"info"][b"length"]
+        info = decoded_data[b"info"]
+        binfo = bencodepy.encode(info)
+        hinfo = hashlib.sha1(binfo).hexdigest()
         print(f"Tracker URL: {tracker_url.decode()}")
         print(f"Length: {length}")
+        print(f"Info hash: {hinfo}")
     else:
         raise NotImplementedError(f"Unknown command {command}")
 
