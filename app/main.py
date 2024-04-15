@@ -41,14 +41,14 @@ def main():
         # Uncomment this block to pass the first stage
         print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
     elif command == "decodetorrent":
-        torrent_file = sys.argv[2]
+        torrent_file = "test files/" +sys.argv[2]
         f = open(torrent_file, "rb")
         data = f.read()
         decoded_data =decode_bencode(data)
         f.close()
         print(decoded_data)
     elif command == "info":
-        torrent_file = sys.argv[2]
+        torrent_file = "test files/" +sys.argv[2]
         f = open(torrent_file, "rb")
         data = f.read()
         decoded_data =decode_bencode(data)
