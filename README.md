@@ -8,3 +8,4 @@ commands:
 - decode: decoding simple bencode
 - decodetorrent: decoding torrent file
 - info: to extract annouce and length
+- peers: gets IP and port of peers
