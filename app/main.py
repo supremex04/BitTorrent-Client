@@ -19,6 +19,24 @@ def decode_bencode(bencoded_value):
     #     raise NotImplementedError("Only strings and integers are supported at the moment")
     return bencodepy.decode(bencoded_value)
 
+def print_info(decoded_data):
+    tracker_url = decoded_data[b"announce"]
+    length = decoded_data[b"info"][b"length"]
+    piece_length = decoded_data[b"info"][b"piece length"]
+    pieces = decoded_data[b"info"][b"pieces"]
+    info = decoded_data[b"info"]
+    binfo = bencodepy.encode(info)
+    hinfo = hashlib.sha1(binfo).hexdigest()
+    print(f"Tracker URL: {tracker_url.decode()}")
+    print(f"Info hash: {hinfo}")
+    print(f"Length: {length}")
+    print(f"Piece Lenght: ")
+    for i in range(len(pieces)//20):
+        piece = pieces[i*20 : (i+1)*20]
+        print(piece.hex())
+
+
+
 
 def main():
     command = sys.argv[1]
@@ -53,14 +71,8 @@ def main():
         data = f.read()
         decoded_data =decode_bencode(data)
         f.close()
-        tracker_url = decoded_data[b"announce"]
-        length = decoded_data[b"info"][b"length"]
-        info = decoded_data[b"info"]
-        binfo = bencodepy.encode(info)
-        hinfo = hashlib.sha1(binfo).hexdigest()
-        print(f"Tracker URL: {tracker_url.decode()}")
-        print(f"Length: {length}")
-        print(f"Info hash: {hinfo}")
+        print_info(decoded_data)
+
     else:
         raise NotImplementedError(f"Unknown command {command}")
 
