@@ -44,7 +44,7 @@ def peer_info(decoded_data):
     info_hash_byte = bytes.fromhex(hinfo)
     params = {
             'info_hash' : info_hash_byte,
-            'peer_id' : '18495285910374614278',
+            'peer_id' : '99112233445566778899',
             'port' : 6881,
             'uploaded' : 0,
             'downloaded' : 0,
@@ -59,17 +59,42 @@ def peer_info(decoded_data):
         # response.content has binary representation of response and response.text has text representation
         decoded_response = bencodepy.decode(response.content)
         peers = decoded_response[b'peers']
+        print(decoded_response[b'interval'])
+        print(peers)
         # every 6 byte contains IP address and port
         # first 4 bytes are IP address, rest are port eg: 192.150.20.11:34501
         peers_ip = []
+        # for item in peers:
+        #     peer_ip.append
         for i in range(0,len(peers), 6):
-            peers_ip.append(f"{peers[i]}.{peers[i+1]}.{peers[i+2]}.{peers[i+3]}:{peers[i+4]}{peers[i+5]}")
+            peers_ip.append(f"{peers[i]}.{peers[i+1]}.{peers[i+2]}.{peers[i+3]}:{peers[i+4]*256 +peers[i+5]}")
     else:
             print( 'Error:', response.status_code)
     
     return peers_ip     
 
-
+def perform_handshake(peers_ip ,info_hash_byte):
+    peer_ip, peer_port = peers_ip[1].split(":")
+    #peer_ip, peer_port = '165.232.33.77', '51467'
+    peer_port = int(peer_port)
+    print(peer_ip)
+    print(peer_port)
+    sock = socket.create_connection((peer_ip, peer_port))
+    print("works")
+    bt_protocol = b'BitTorrent protocol'
+    protocol_length = len(bt_protocol).to_bytes(1, byteorder="big")
+    reserved = b'\x00' * 8  #8 bytes reserved x00 is hex representation and \ to escape
+    peer_id = b'00112233445566778899'
+    payload = protocol_length + bt_protocol + reserved + info_hash_byte + peer_id
+    sock.send(payload)
+    print('works')
+    received = sock.recv(68)
+    return received
+    # [SUCCESS] IP address and port of peers:  
+    # 165.232.33.77:20111
+    # 178.62.85.20:20133
+    # 178.62.82.89:200248
+    
 
 
 def main():
@@ -117,6 +142,18 @@ def main():
         peers_ip = peer_info(decoded_data)
         for item in peers_ip:
             print(item)        
+    elif command == "handshake":
+        torrent_file = "test files/" +sys.argv[2]
+        with open(torrent_file, "rb") as f:
+            data = f.read()
+            decoded_data =decode_bencode(data)
+        peers_ip = peer_info(decoded_data)
+        _,hinfo,*_ = info(decoded_data)
+        info_hash_byte = bytes.fromhex(hinfo)
+        received = perform_handshake(peers_ip, info_hash_byte)
+        received_peer_id = received[48:]
+        print(f'[HANDSHAKE SUCCESS] Received Peer ID: {received_peer_id.hex()}')
+
 
     else:
         raise NotImplementedError(f"Unknown command {command}")
