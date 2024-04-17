@@ -184,7 +184,7 @@ class PeerComm:
         The recv() function doesn't guarantee that it will receive all the data at once
         By iterating and repeatedly calling recv(), the code ensures that it receives all 
         parts of the block until the expected size (size_of_block) is reached.
-        he loop condition while received < size_of_block ensures that the loop continues until 
+        The loop condition while received < size_of_block ensures that the loop continues until 
         the expected amount of data is received, preventing any 
         additional data from being appended to full_block.
         """
