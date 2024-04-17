@@ -6,6 +6,139 @@ import requests
 import binascii
 import socket
 
+CHOKE_ID = 0
+UNCHOKE_ID = 1
+INTERESTED_ID = 2
+NOT_INTERESTED_ID = 3
+HAVE_ID = 4
+BITFIELD_ID = 5
+REQUEST_ID = 6
+PIECE_ID = 7
+CANCEL_ID = 8
+BLOCK_SIZE = 2**14 # 16KB
+
+class PeerMessage:
+    def __init__(self, message_id: bytes, payload: bytes):
+        self.message_id = message_id
+        self.payload = payload
+        self.message_length_prefix = len(message_id + payload).to_bytes(4, byteorder="big")
+
+    def get_decoded(self):
+        return {
+            "message_length_prefix": self.message_length_prefix.hex(),
+            "message_id": self.message_id.hex(),
+            "payload": self.payload.hex(),
+        }
+    
+    def get_encoded(self):
+        return self.message_length_prefix + self.message_id + self.payload
+
+
+class PeerComm:
+    def __init__(self, sock):
+        self.sock = sock
+    """
+    The choke message is used to notify the peer that the client is not interested in downloading pieces from the peer.
+    The choke message has the following format:
+    <length><message_id>
+    length: 4 bytes for length of the message
+    message_id: 1 byte for message identifier
+    """
+    def choke(self):
+        message_id = CHOKE_ID.to_bytes(1, byteorder = 'big')
+        payload = b''
+        peer_message = PeerMessage(message_id, payload)
+        self.sock.sendall(peer_message.get_encoded())
+    """
+    The unchoke message is used to notify the peer that the client is ready to download pieces from the peer.
+    The unchoke message has the following format:
+    <length><message_id>
+    length: 4 bytes for length of the message
+    message_id: 1 byte for message identifier
+    """
+    def unchoke(self):
+        message_id = UNCHOKE_ID.to_bytes(1, byteorder = 'big')
+        payload = b''
+        peer_message = PeerMessage(message_id, payload)
+        self.sock.sendall(peer_message.get_encoded())
+
+    def listen_unchoke(self):
+        response = self.sock.recv(5)
+        message_id = response[4]
+
+        if message_id != UNCHOKE_ID:
+            raise ValueError(f'Invalid message id: {message_id} for unchoke message')
+    """
+    The interested message is used to notify the peer that the client is interested in downloading pieces from the peer.
+    The interested message has the following format:
+    <length><message_id>
+    length: 4 bytes for length of the message
+    message_id: 1 byte for message identifier
+    """
+    def interested(self):
+        message_id = INTERESTED_ID.to_bytes(1, byteorder = 'big')
+        payload = b''
+        peer_message = PeerMessage(message_id, payload)
+        self.sock.sendall(peer_message.get_encoded())
+    """
+    The not interested message is used to notify the peer that the client is not interested in downloading pieces from the peer.
+    The not interested message has the following format:
+    <length><message_id>
+    length: 4 bytes for length of the message
+    message_id: 1 byte for message identifier
+    """
+    def not_interested(self):
+        message_id = NOT_INTERESTED_ID.to_bytes(1, byteorder = 'big')
+        payload = b''
+        peer_message = PeerMessage(message_id, payload)
+        self.sock.sendall(peer_message.get_encoded())
+
+    """
+    The have message is used to notify the peer that the client has downloaded a piece.
+    The have message has the following format:
+    <length><message_id><payload>
+    length: 4 bytes for length of the message
+    message_id: 1 byte for message identifier
+    payload: 4 bytes for the zero-based piece index
+    """
+    def have(self):
+        message_id = HAVE_ID.to_bytes(1, byteorder = 'big')
+        payload = b''
+        peer_message = PeerMessage(message_id, payload)
+        self.sock.sendall(peer_message.get_encoded())     
+    """"
+    The bitfield message is used to specify which pieces the peer has.
+    The bitfield message has the following format:
+    <length><message_id><payload>
+    length: 4 bytes for length of the message ie. message id and payload
+    message_id: 1 byte for message identifier
+    payload: variable length payload representing the pieces
+    """
+    def bitfield_listen(self) -> list[int]:
+        # receive length prefix and message id
+        response = self.socket.recv(5)
+        length = int.from_bytes(response[0:4], byteorder="big")
+        message_id = response[4]
+        if message_id != BITFIELD_ID:
+            raise ValueError(f"Invalid message id: {message_id} for bitfield message")
+        # receive the remaining message of length -1 (1 accounting for message id which is already received)
+    
+        payload = self.socket.recv(length - 1)
+        
+        payload_str = "".join(format(x, "08b") for x in payload)
+        # print(payload_str)
+        indexes_of_pieces = [i for i, bit in enumerate(payload_str) if bit == "1"]
+        return indexes_of_pieces
+    #     first_colon_index = bencoded_value.find(b":")
+    """
+    The request message is used to request a piece from the peer.
+    The request message has the following format:
+    <length><message_id><payload>
+    length: 4 bytes for length of the message
+    message_id: 1 byte for message identifier
+    payload: 12 bytes payload representing the index, begin, and length
+    """
+    
 
 def decode_bencode(bencoded_value):
     # if chr(bencoded_value[0]).isdigit():
@@ -83,8 +216,8 @@ def peer_info(decoded_data):
     return peers_ip     
 
 
-def perform_handshake(sysarg2):
-    decoded_data =decode_torrent(sysarg2)
+def perform_handshake(sysargv2):
+    decoded_data =decode_torrent(sysargv2)
     peers_ip = peer_info(decoded_data)
     _,hinfo,*_ = info(decoded_data)
     info_hash_byte = bytes.fromhex(hinfo)
@@ -108,10 +241,12 @@ def perform_handshake(sysarg2):
     # 178.62.85.20:20133
     # 178.62.82.89:200248
     
-def download_piece():
-    # 
-    perform_handshake(peers_ip, info_hash_byte)
-    return 
+# def download_piece(sysargv2):
+#     # 
+#     _ = perform_handshake(sysargv2)
+    
+
+#     return 
 
 def main():
     command = sys.argv[1]
