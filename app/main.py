@@ -116,14 +116,14 @@ class PeerComm:
     """
     def bitfield_listen(self) -> list[int]:
         # receive length prefix and message id
-        response = self.socket.recv(5)
+        response = self.sock.recv(5)
         length = int.from_bytes(response[0:4], byteorder="big")
         message_id = response[4]
         if message_id != BITFIELD_ID:
             raise ValueError(f"Invalid message id: {message_id} for bitfield message")
         # receive the remaining message of length -1 (1 accounting for message id which is already received)
     
-        payload = self.socket.recv(length - 1)
+        payload = self.sock.recv(length - 1)
         
         payload_str = "".join(format(x, "08b") for x in payload)
         # print(payload_str)
@@ -134,6 +134,7 @@ class PeerComm:
     The request message is used to request a piece from the peer.
     The request message has the following format:
     <length><message_id><payload>
+    <len=0013><id=6><index><begin><length>
     length: 4 bytes for length of the message
     message_id: 1 byte for message identifier
     payload: 12 bytes payload representing the index, begin, and length
@@ -151,11 +152,52 @@ class PeerComm:
             payload += block_length.to_bytes(4, byteorder="big")
             peer_message = PeerMessage(message_id, payload)
             # send the request message
-            self.socket.sendall(peer_message.get_encoded())
+            self.sock.sendall(peer_message.get_encoded())
             _, begin, block = self.piece_listen()  # listen for the piece message
             full_block += block
             print(f"Recieved {len(full_block)} bytes")
         return full_block
+    """
+    The piece message is used to send a piece to the peer.
+    The piece message has the following format:
+    <length><message_id><payload>
+    piece: <len=0009+X><id=7><index><begin><block>
+    length: 4 bytes for length of the message
+    message_id: 1 byte for message identifier
+    payload: variable length payload representing the piece 
+        index: the zero-based piece index
+        begin: the zero-based byte offset within the piece
+        block: the data for the piece, usually 2^14 bytes long
+    """
+    def piece_listen(self):
+        print("-----Listening for Piece-----")
+        length = int.from_bytes(self.sock.recv(4), byteorder="big")
+        message_id = int.from_bytes(self.sock.recv(1), byteorder="big")
+        if message_id != PIECE_ID:
+            raise ValueError(f"Invalid message id: {message_id} for piece message")
+        piece_index = int.from_bytes(self.sock.recv(4), byteorder="big")
+        begin = int.from_bytes(self.sock.recv(4), byteorder="big")
+        recieved = 0
+        size_of_block = length - 9
+        full_block = b""
+        """
+        The recv() function doesn't guarantee that it will receive all the data at once
+        By iterating and repeatedly calling recv(), the code ensures that it receives all 
+        parts of the block until the expected size (size_of_block) is reached.
+        he loop condition while received < size_of_block ensures that the loop continues until 
+        the expected amount of data is received, preventing any 
+        additional data from being appended to full_block.
+        """
+        while recieved < size_of_block:
+            print(f"Recieved: {recieved} - Size: {size_of_block}")
+            block = self.sock.recv(size_of_block - recieved)
+            full_block += block
+            recieved += len(block)
+        print(f"Recieved: {recieved} - Size: {size_of_block}")
+        return piece_index, begin, full_block
+    def cancel(self):
+        pass
+
 
 
 def decode_bencode(bencoded_value):
