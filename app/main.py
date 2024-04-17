@@ -83,7 +83,11 @@ def peer_info(decoded_data):
     return peers_ip     
 
 
-def perform_handshake(peers_ip ,info_hash_byte):
+def perform_handshake(sysarg2):
+    decoded_data =decode_torrent(sysarg2)
+    peers_ip = peer_info(decoded_data)
+    _,hinfo,*_ = info(decoded_data)
+    info_hash_byte = bytes.fromhex(hinfo)
     peer_ip, peer_port = peers_ip[1].split(":")
     
     # peer_ip, peer_port = '165.232.33.77', '51467'
@@ -104,7 +108,10 @@ def perform_handshake(peers_ip ,info_hash_byte):
     # 178.62.85.20:20133
     # 178.62.82.89:200248
     
-
+def download_piece():
+    # 
+    perform_handshake(peers_ip, info_hash_byte)
+    return 
 
 def main():
     command = sys.argv[1]
@@ -141,11 +148,7 @@ def main():
             print(item)        
 
     elif command == "handshake":
-        decoded_data =decode_torrent(sys.argv[2])
-        peers_ip = peer_info(decoded_data)
-        _,hinfo,*_ = info(decoded_data)
-        info_hash_byte = bytes.fromhex(hinfo)
-        received = perform_handshake(peers_ip, info_hash_byte)
+        received = perform_handshake(sys.argv[2])
         received_peer_id = received[48:]
         print(f'[HANDSHAKE SUCCESS] Received Peer ID: {received_peer_id.hex()}')
 
