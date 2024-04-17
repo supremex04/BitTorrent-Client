@@ -138,7 +138,25 @@ class PeerComm:
     message_id: 1 byte for message identifier
     payload: 12 bytes payload representing the index, begin, and length
     """
-    
+    def request_send(self, piece_index: int, piece_length: int) -> bytes:
+        message_id = REQUEST_ID.to_bytes(1, byteorder="big")
+        full_block = b""
+        for offset in range(0, piece_length, BLOCK_SIZE):
+            print("-----Requesting Block-----")
+            print(f"Offset: {offset} - Length: {piece_length}")
+            # to ensure that the unusual size of last block is considered
+            block_length = min(BLOCK_SIZE, piece_length - offset)
+            payload = piece_index.to_bytes(4, byteorder="big")
+            payload += offset.to_bytes(4, byteorder="big")
+            payload += block_length.to_bytes(4, byteorder="big")
+            peer_message = PeerMessage(message_id, payload)
+            # send the request message
+            self.socket.sendall(peer_message.get_encoded())
+            _, begin, block = self.piece_listen()  # listen for the piece message
+            full_block += block
+            print(f"Recieved {len(full_block)} bytes")
+        return full_block
+
 
 def decode_bencode(bencoded_value):
     # if chr(bencoded_value[0]).isdigit():
