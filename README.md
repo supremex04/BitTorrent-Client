@@ -9,3 +9,4 @@ commands:
 - decodetorrent: decoding torrent file
 - info: to extract annouce and length
 - peers: gets IP and port of peers
+- handshake: handshakes with the peer on 0th index (you may change according to your preference)
