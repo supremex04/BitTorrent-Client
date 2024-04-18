@@ -13,5 +13,5 @@ commands:
 
 To download a piece:
 ```
-./bittorrent.sh download_piece {torrent file} -o downloaded_files/{piece_name} 0
+./bittorrent.sh download_piece {torrent file} -o downloaded_files/{piece_name} {piece_index}
 ```
