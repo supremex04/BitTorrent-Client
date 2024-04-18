@@ -144,8 +144,8 @@ class PeerComm:
         message_id = REQUEST_ID.to_bytes(1, byteorder="big")
         full_block = b""
         for offset in range(0, piece_length, BLOCK_SIZE):
-            print("-----Requesting Block-----")
-            print(f"Offset: {offset} - Length: {piece_length}")
+            # print("-----Requesting Block-----")
+            # print(f"Offset: {offset} - Length: {piece_length}")
             # to ensure that the unusual size of last block is considered
             block_length = min(BLOCK_SIZE, piece_length - offset)
             payload = piece_index.to_bytes(4, byteorder="big")
@@ -156,7 +156,7 @@ class PeerComm:
             self.sock.sendall(peer_message.get_encoded())
             _, begin, block = self.piece_listen()  # listen for the piece message
             full_block += block
-            print(f"Recieved {len(full_block)} bytes")
+            # print(f"Recieved {len(full_block)} bytes")
         return full_block
     """
     The piece message is used to send a piece to the peer.
@@ -171,7 +171,7 @@ class PeerComm:
         block: the data for the piece, usually 2^14 bytes long
     """
     def piece_listen(self):
-        print("-----Listening for Piece-----")
+        # print("-----Listening for Piece-----")
         length = int.from_bytes(self.sock.recv(4), byteorder="big")
         message_id = int.from_bytes(self.sock.recv(1), byteorder="big")
         if message_id != PIECE_ID:
@@ -190,16 +190,16 @@ class PeerComm:
         additional data from being appended to full_block.
         """
         while recieved < size_of_block:
-            print(f"Recieved: {recieved} - Size: {size_of_block}")
+            # print(f"Recieved: {recieved} - Size of block: {size_of_block}")
             block = self.sock.recv(size_of_block - recieved)
             full_block += block
             recieved += len(block)
-        print(f"Recieved: {recieved} - Size: {size_of_block}")
+        # print(f"Recieved: {recieved} - Size: {size_of_block}")
         return piece_index, begin, full_block
     def cancel(self):
         pass
 
-def handle_download_piece(download_directory, torrent_file_name, piece):
+def handle_download_piece(download_directory, torrent_file_name, piece_index):
     decoded_data = decode_torrent(torrent_file_name)
 
     # connect to the tracker and get the peers
@@ -210,24 +210,36 @@ def handle_download_piece(download_directory, torrent_file_name, piece):
     # peer_ip, peer_port = peers_ip.split(":")
     # peer_port = int(peer_port)
     indexes_of_pieces = peer.bitfield_listen()
-    if piece not in indexes_of_pieces:
+    if piece_index not in indexes_of_pieces:
         raise ValueError(f"Peer does not have piece {piece}")
     peer.interested_send()
     peer.listen_unchoke()
-    _,_,length, piece_list,piece_length = info(decoded_data)
+    _,_,length, piece_list,piece_length= info(decoded_data)
     # to get the piece_length of last piece
-    if piece == (len(piece_list)) - 1:
+    if piece_index == (len(piece_list)) - 1:
         piece_length = length % piece_length
-    block = peer.request_send(piece, piece_length)
-    print(len(block))
-    try:
-        with open(f"{download_directory}", "wb") as f:
-            f.write(block)
-            print(f"Piece {piece} downloaded to {download_directory}")
-    except Exception as e:
-        print(e)
+    # requests for blocks until the whole piece is received
+    print("-----Listening for Piece-----")
+    piece = peer.request_send(piece_index, piece_length)
+
+    # piece_hash = piece_hashes[piece_index * 20 : (piece_index + 1) * 20]
+    return piece
 
 
+def piece_aggregator(download_directory, torrent_file_name):
+    decoded_data = decode_torrent(torrent_file_name)
+    f = open(f"{download_directory}/file" , "wb")
+    _,_,length, piece_list,piece_length = info(decoded_data)
+    i = 0
+    for piece_hash in piece_list:
+        piece = handle_download_piece(download_directory, torrent_file_name,i)
+        piece_hex = hashlib.sha1(piece).hexdigest()
+        if piece_hash == piece_hex:
+            print(f"[SUCCESS] Received Piece: {i}" )
+            print(f'[SIZE OF PIECE {i}]: {len(piece)}')
+            i = i+1
+            f.write(piece)
+            
 def decode_bencode(bencoded_value):
     # if chr(bencoded_value[0]).isdigit():
     #     first_colon_index = bencoded_value.find(b":")
@@ -378,10 +390,20 @@ def main():
         assert sys.argv[3] == "-o", "Expected -o as the second argument"
         output_directory = sys.argv[4]  
         torrent_file_name = sys.argv[2]  
-        piece = int(sys.argv[5])  
-        
-        handle_download_piece(output_directory, torrent_file_name, piece)
+        piece_index = int(sys.argv[5])  
 
+        piece = handle_download_piece(output_directory, torrent_file_name, piece)
+        try:
+            with open(f"{output_directory}", "wb") as f:
+                f.write(piece)
+                print(f"Piece {piece_index} downloaded to {output_directory}")
+        except Exception as e:
+            print(e)       
+    elif command == "download_file":
+        assert sys.argv[3] == "-o", "Expected -o as the second argument"
+        output_directory = sys.argv[4]  
+        torrent_file_name = sys.argv[2]  
+        piece_aggregator(output_directory, torrent_file_name)      
 
     else:
         raise NotImplementedError(f"Unknown command {command}")
