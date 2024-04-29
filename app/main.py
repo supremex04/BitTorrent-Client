@@ -5,6 +5,7 @@ import hashlib
 import requests 
 import binascii
 import socket
+import concurrent.futures
 
 MY_PEER_ID = b'99112233445566778899'
 CHOKE_ID = 0
@@ -206,25 +207,26 @@ def handle_download_piece(download_directory, torrent_file_name, piece_index):
     # connect to the tracker and get the peers
     peers_ip = peer_info(decoded_data)
     # connect to the first peer and send the handshake message
-    _,sock = perform_handshake(torrent_file_name)
-    peer = PeerComm(sock)
+    sockets = perform_handshake(torrent_file_name)
+    peer = PeerComm(sockets[0][1])
     # peer_ip, peer_port = peers_ip.split(":")
     # peer_port = int(peer_port)
     indexes_of_pieces = peer.bitfield_listen()
     if piece_index not in indexes_of_pieces:
         raise ValueError(f"Peer does not have piece: {piece_index}")
-    peer.interested_send()
-    peer.listen_unchoke()
-    _,_,length, piece_list,piece_length= info(decoded_data)
-    # to get the piece_length of last piece
-    if piece_index == (len(piece_list)) - 1:
-        piece_length = length % piece_length
-    # requests for blocks until the whole piece is received
-    print(f"-----Listening for Piece: {piece_index}-----")
-    piece = peer.request_send(piece_index, piece_length)
+    else: 
+        peer.interested_send()
+        peer.listen_unchoke()
+        _,_,length, piece_list,piece_length= info(decoded_data)
+        # to get the piece_length of last piece
+        if piece_index == (len(piece_list)) - 1:
+            piece_length = length % piece_length
+        # requests for blocks until the whole piece is received
+        print(f"-----Listening for Piece: {piece_index}-----")
+        piece = peer.request_send(piece_index, piece_length)
 
-    # piece_hash = piece_hashes[piece_index * 20 : (piece_index + 1) * 20]
-    return piece
+        # piece_hash = piece_hashes[piece_index * 20 : (piece_index + 1) * 20]
+        return piece
 
 
 def piece_aggregator(download_directory, torrent_file_name):
@@ -242,18 +244,6 @@ def piece_aggregator(download_directory, torrent_file_name):
             f.write(piece)
             
 def decode_bencode(bencoded_value):
-    # if chr(bencoded_value[0]).isdigit():
-    #     first_colon_index = bencoded_value.find(b":")
-    #     if first_colon_index == -1:
-    #         raise ValueError("Invalid encoded value")
-    #     return bencoded_value[first_colon_index+1:]
-    # elif chr(bencoded_value[0]) == "i":
-    #     endIndex = bencoded_value[1:].find(b"e") +1
-    #     return int(bencoded_value[1:endIndex])
-    # elif chr(bencoded_value[0]) == "l":
-    #     if 
-    # else:
-    #     raise NotImplementedError("Only strings and integers are supported at the moment")
     return bencodepy.decode(bencoded_value)
 
 
@@ -280,7 +270,7 @@ def info(decoded_data):
         piece_list.append(piece.hex())
     return tracker_url, hinfo, length, piece_list, piece_length
 
-# returns peers IP and Port from tracker
+# returns list of peers IP and Port from tracker
 def peer_info(decoded_data):
     tracker_url, hinfo, length, piece_list,_ = info(decoded_data)
     # converting hexdigest which is of 40 characters long (each byte is represented as two hex characters) 
@@ -315,34 +305,32 @@ def peer_info(decoded_data):
             print( 'Error:', response.status_code)
     
     return peers_ip     
-
-
+    
 def perform_handshake(sysargv2):
     decoded_data =decode_torrent(sysargv2)
     peers_ip = peer_info(decoded_data)
     _,hinfo,*_ = info(decoded_data)
     info_hash_byte = bytes.fromhex(hinfo)
-    peer_ip, peer_port = peers_ip[1].split(":")
-    
-    # peer_ip, peer_port = '165.232.33.77', '51467'
-    peer_port = int(peer_port)
-    sock = socket.create_connection((peer_ip, peer_port))
-
     bt_protocol = b'BitTorrent protocol'
-    protocol_length = len(bt_protocol).to_bytes(1, byteorder="big")
-    reserved = b'\x00' * 8  # 8 bytes reserved x00 is hex representation and \ to escape
     peer_id = b'00112233445566778899'
-    
-    payload = protocol_length + bt_protocol + reserved + info_hash_byte + peer_id
-    sock.send(payload)
-    received = sock.recv(68)
-    connected_peer_id = received[48:]
-    return connected_peer_id, sock
+    protocol_length = len(bt_protocol).to_bytes(1, byteorder="big")
+    reserved = b'\x00' * 8  # 8 bytes reserved x00 is hex representation and \ to escape      
+    # peer_ip, peer_port = '165.232.33.77', '51467'
+    sockets = []   
+    for peerport in peers_ip:
+        peer_ip, peer_port = peerport.split(":")
+        peer_port = int(peer_port)
+        sock = socket.create_connection((peer_ip, peer_port))   
+        payload = protocol_length + bt_protocol + reserved + info_hash_byte + peer_id
+        sock.send(payload)
+        received = sock.recv(68)
+        connected_peer_id = received[48:]
+        sockets.append((connected_peer_id, sock))
     # [SUCCESS] IP address and port of peers:  
     # 165.232.33.77:20111
     # 178.62.85.20:20133
     # 178.62.82.89:200248
-    
+    return sockets
 # def download_piece(sysargv2):
 #     # 
 #     _ = perform_handshake(sysargv2)

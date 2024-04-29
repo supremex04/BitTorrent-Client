@@ -7,7 +7,7 @@ To download a piece:
 ```
 To download the whole file:
 ```
-./bittorrent.sh download_piece {torrent file} -o ./downloaded_files
+./bittorrent.sh download_file {torrent file} -o ./downloaded_files
 ```
 
 ``` 
