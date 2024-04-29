@@ -18,6 +18,7 @@ PIECE_ID = 7
 CANCEL_ID = 8
 BLOCK_SIZE = 2**14 # 16KB
 
+# encodes and decodes the message
 class PeerMessage:
     def __init__(self, message_id: bytes, payload: bytes):
         self.message_id = message_id
@@ -125,7 +126,7 @@ class PeerComm:
         # receive the remaining message of length -1 (1 accounting for message id which is already received)
     
         payload = self.sock.recv(length - 1)
-        
+        # convert each byte of payload into 8 bit binary value and concatenate it into a string
         payload_str = "".join(format(x, "08b") for x in payload)
         # print(payload_str)
         indexes_of_pieces = [i for i, bit in enumerate(payload_str) if bit == "1"]
@@ -211,7 +212,7 @@ def handle_download_piece(download_directory, torrent_file_name, piece_index):
     # peer_port = int(peer_port)
     indexes_of_pieces = peer.bitfield_listen()
     if piece_index not in indexes_of_pieces:
-        raise ValueError(f"Peer does not have piece {piece}")
+        raise ValueError(f"Peer does not have piece: {piece_index}")
     peer.interested_send()
     peer.listen_unchoke()
     _,_,length, piece_list,piece_length= info(decoded_data)
@@ -219,7 +220,7 @@ def handle_download_piece(download_directory, torrent_file_name, piece_index):
     if piece_index == (len(piece_list)) - 1:
         piece_length = length % piece_length
     # requests for blocks until the whole piece is received
-    print("-----Listening for Piece-----")
+    print(f"-----Listening for Piece: {piece_index}-----")
     piece = peer.request_send(piece_index, piece_length)
 
     # piece_hash = piece_hashes[piece_index * 20 : (piece_index + 1) * 20]
@@ -263,7 +264,7 @@ def decode_torrent(sysarg):
     decoded_data =decode_bencode(data)
     return decoded_data
 
-
+# returns torrent info
 def info(decoded_data):
     piece_list = []
     tracker_url = decoded_data[b"announce"]
@@ -279,7 +280,7 @@ def info(decoded_data):
         piece_list.append(piece.hex())
     return tracker_url, hinfo, length, piece_list, piece_length
 
-
+# returns peers IP and Port from tracker
 def peer_info(decoded_data):
     tracker_url, hinfo, length, piece_list,_ = info(decoded_data)
     # converting hexdigest which is of 40 characters long (each byte is represented as two hex characters) 
