@@ -1,3 +1,6 @@
+For learning.
+Currently only supports ipv4 peers and download is not concurrent.
+
 - torrent file must be in "test files" folder
 - run format for decoding/parsing
 
