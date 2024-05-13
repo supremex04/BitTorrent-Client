@@ -201,7 +201,7 @@ class PeerComm:
     def cancel(self):
         pass
 
-def handle_download_piece(download_directory, torrent_file_name, piece_index):
+def download_piece(download_directory, torrent_file_name, piece_index):
     decoded_data = decode_torrent(torrent_file_name)
 
     # connect to the tracker and get the peers
@@ -222,7 +222,7 @@ def handle_download_piece(download_directory, torrent_file_name, piece_index):
         if piece_index == (len(piece_list)) - 1:
             piece_length = length % piece_length
         # requests for blocks until the whole piece is received
-        print(f"-----Listening for Piece: {piece_index}-----")
+        print(f"-----Listening for Piece:-----")
         piece = peer.request_send(piece_index, piece_length)
 
         # piece_hash = piece_hashes[piece_index * 20 : (piece_index + 1) * 20]
@@ -235,7 +235,7 @@ def piece_aggregator(download_directory, torrent_file_name):
     _,_,length, piece_list,piece_length = info(decoded_data)
     i = 0
     for piece_hash in piece_list:
-        piece = handle_download_piece(download_directory, torrent_file_name,i)
+        piece = download_piece(download_directory, torrent_file_name,i)
         piece_hex = hashlib.sha1(piece).hexdigest()
         if piece_hash == piece_hex:
             print(f"[SUCCESS] Received Piece: {i}" )
@@ -278,7 +278,7 @@ def peer_info(decoded_data):
     info_hash_byte = bytes.fromhex(hinfo)
     params = {
             'info_hash' : info_hash_byte,
-            'peer_id' : '99112233445566778899',
+            'peer_id' : MY_PEER_ID,
             'port' : 6881,
             'uploaded' : 0,
             'downloaded' : 0,
@@ -339,6 +339,7 @@ def perform_handshake(sysargv2):
 #     return 
 
 def main():
+    decoded_data =decode_torrent(sys.argv[2])
     command = sys.argv[1]
 
     # print("Logs")
@@ -353,11 +354,9 @@ def main():
         print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
 
     elif command == "decodetorrent":
-        decoded_data =decode_torrent(sys.argv[2])
         print(decoded_data)
 
     elif command == "info":
-        decoded_data =decode_torrent(sys.argv[2])
         tracker_url, hinfo, length, piece_list = info(decoded_data)
         print(f"Tracker URL: {tracker_url.decode()}")
         print(f"Info hash: {hinfo}")
@@ -367,7 +366,6 @@ def main():
             print(piece)
 
     elif command == "peers":
-        decoded_data =decode_torrent(sys.argv[2])
         peers_ip = peer_info(decoded_data)
         for item in peers_ip:
             print(item)        
@@ -381,7 +379,7 @@ def main():
         torrent_file_name = sys.argv[2]  
         piece_index = int(sys.argv[5])  
 
-        piece = handle_download_piece(output_directory, torrent_file_name, piece)
+        piece = download_piece(output_directory, torrent_file_name, piece)
         try:
             with open(f"{output_directory}", "wb") as f:
                 f.write(piece)
