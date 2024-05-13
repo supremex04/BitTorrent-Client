@@ -201,14 +201,14 @@ class PeerComm:
     def cancel(self):
         pass
 
-def download_piece(download_directory, torrent_file_name, piece_index):
-    decoded_data = decode_torrent(torrent_file_name)
+def download_piece(decoded_data, piece_index):
 
     # connect to the tracker and get the peers
     peers_ip = peer_info(decoded_data)
     # connect to the first peer and send the handshake message
-    sockets = perform_handshake(torrent_file_name)
-    peer = PeerComm(sockets[0][1])
+    sockets = perform_handshake(decoded_data)
+    # temporary management
+    peer = PeerComm(sockets[piece_index][1])
     # peer_ip, peer_port = peers_ip.split(":")
     # peer_port = int(peer_port)
     indexes_of_pieces = peer.bitfield_listen()
@@ -229,13 +229,12 @@ def download_piece(download_directory, torrent_file_name, piece_index):
         return piece
 
 
-def piece_aggregator(download_directory, torrent_file_name):
-    decoded_data = decode_torrent(torrent_file_name)
-    f = open(f"{download_directory}/file" , "wb")
-    _,_,length, piece_list,piece_length = info(decoded_data)
+def piece_aggregator(decoded_data):
+    f = open(f"./downloaded_files/file" , "wb")
+    _,_,_, piece_list,_ = info(decoded_data)
     i = 0
     for piece_hash in piece_list:
-        piece = download_piece(download_directory, torrent_file_name,i)
+        piece = download_piece(decoded_data,i)
         piece_hex = hashlib.sha1(piece).hexdigest()
         if piece_hash == piece_hex:
             print(f"[SUCCESS] Received Piece: {i}" )
@@ -302,12 +301,12 @@ def peer_info(decoded_data):
             # port number are stored in big-endian format so, higher byte*256 + lower byte gives the port address
             peers_ip.append(f"{peers[i]}.{peers[i+1]}.{peers[i+2]}.{peers[i+3]}:{peers[i+4]*256 +peers[i+5]}")
     else:
-            print( 'Error:', response.status_code)
+            print( 'Error: ', response.status_code)
     
     return peers_ip     
     
-def perform_handshake(sysargv2):
-    decoded_data =decode_torrent(sysargv2)
+# returns a list of (connected peer id, sock) pair
+def perform_handshake(decoded_data):
     peers_ip = peer_info(decoded_data)
     _,hinfo,*_ = info(decoded_data)
     info_hash_byte = bytes.fromhex(hinfo)
@@ -371,26 +370,20 @@ def main():
             print(item)        
 
     elif command == "handshake":
-        received_peer_id = perform_handshake(sys.argv[2])
+        received_peer_id = perform_handshake(decoded_data)
         print(f'[HANDSHAKE SUCCESS] Received Peer ID: {received_peer_id.hex()}')
     elif command == "download_piece":
-        assert sys.argv[3] == "-o", "Expected -o as the second argument"
-        output_directory = sys.argv[4]  
-        torrent_file_name = sys.argv[2]  
-        piece_index = int(sys.argv[5])  
+        piece_index = int(sys.argv[3])  
 
-        piece = download_piece(output_directory, torrent_file_name, piece)
+        piece = download_piece(decoded_data, piece_index)
         try:
-            with open(f"{output_directory}", "wb") as f:
+            with open(f"./downloaded_files/piece{piece_index}", "wb") as f:
                 f.write(piece)
-                print(f"Piece {piece_index} downloaded to {output_directory}")
+                print(f"Piece {piece_index} downloaded to ./downloaded_files")
         except Exception as e:
             print(e)       
     elif command == "download_file":
-        assert sys.argv[3] == "-o", "Expected -o as the second argument"
-        output_directory = sys.argv[4]  
-        torrent_file_name = sys.argv[2]  
-        piece_aggregator(output_directory, torrent_file_name)      
+        piece_aggregator(decoded_data)      
 
     else:
         raise NotImplementedError(f"Unknown command {command}")

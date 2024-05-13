@@ -3,11 +3,11 @@
 
 To download a piece:
 ```
-./bittorrent.sh download_piece {torrent file} -o ./downloaded_files/{piece_name} {piece_index}
+./bittorrent.sh download_piece {torrent file} {piece_index}
 ```
 To download the whole file:
 ```
-./bittorrent.sh download_file {torrent file} -o ./downloaded_files
+./bittorrent.sh download_file {torrent file} 
 ```
 
 ``` 
