@@ -1,9 +1,7 @@
-import json
 import sys
 import bencodepy
 import hashlib
 import requests 
-import binascii
 import socket
 import concurrent.futures
 
@@ -18,7 +16,7 @@ REQUEST_ID = 6
 PIECE_ID = 7
 CANCEL_ID = 8
 BLOCK_SIZE = 2**14 # 16KB
-
+sockets = []
 # encodes and decodes the message
 class PeerMessage:
     def __init__(self, message_id: bytes, payload: bytes):
@@ -202,11 +200,12 @@ class PeerComm:
         pass
 
 def download_piece(decoded_data, piece_index):
-
+    global sockets
     # connect to the tracker and get the peers
     peers_ip = peer_info(decoded_data)
     # connect to the first peer and send the handshake message
-    sockets = perform_handshake(decoded_data)
+    if not sockets:
+        perform_handshake(decoded_data)
     # temporary management
     peer = PeerComm(sockets[piece_index][1])
     # peer_ip, peer_port = peers_ip.split(":")
@@ -307,6 +306,7 @@ def peer_info(decoded_data):
     
 # returns a list of (connected peer id, sock) pair
 def perform_handshake(decoded_data):
+    global sockets
     peers_ip = peer_info(decoded_data)
     _,hinfo,*_ = info(decoded_data)
     info_hash_byte = bytes.fromhex(hinfo)
@@ -315,7 +315,6 @@ def perform_handshake(decoded_data):
     protocol_length = len(bt_protocol).to_bytes(1, byteorder="big")
     reserved = b'\x00' * 8  # 8 bytes reserved x00 is hex representation and \ to escape      
     # peer_ip, peer_port = '165.232.33.77', '51467'
-    sockets = []   
     for peerport in peers_ip:
         peer_ip, peer_port = peerport.split(":")
         peer_port = int(peer_port)
@@ -329,7 +328,6 @@ def perform_handshake(decoded_data):
     # 165.232.33.77:20111
     # 178.62.85.20:20133
     # 178.62.82.89:200248
-    return sockets
 # def download_piece(sysargv2):
 #     # 
 #     _ = perform_handshake(sysargv2)
@@ -341,18 +339,7 @@ def main():
     decoded_data =decode_torrent(sys.argv[2])
     command = sys.argv[1]
 
-    # print("Logs")
-
-    if command == "decode":
-        bencoded_value = sys.argv[2].encode()
-
-        def bytes_to_str(data):
-            if isinstance(data, bytes):
-                return data.decode()
-            raise TypeError(f"Type not serializable: {type(data)}")
-        print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
-
-    elif command == "decodetorrent":
+    if command == "decodetorrent":
         print(decoded_data)
 
     elif command == "info":
@@ -370,8 +357,8 @@ def main():
             print(item)        
 
     elif command == "handshake":
-        received_peer_id = perform_handshake(decoded_data)
-        print(f'[HANDSHAKE SUCCESS] Received Peer ID: {received_peer_id.hex()}')
+        perform_handshake(decoded_data)
+        print(f'[HANDSHAKE SUCCESS] Received Peer ID: {sockets[0][0].hex()}')
     elif command == "download_piece":
         piece_index = int(sys.argv[3])  
 
